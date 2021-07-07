@@ -1,0 +1,54 @@
+                    Cazan Bogdan-Marian 323CB
+                TEMA 1 - PROTOCOALE DE COMUNICATIE
+
+        In cadrul acestei teme, am implementat functionalitatile unui router,
+anume procesul de dirijare al pachetelor primite de la un host sursa catre unul
+destinatie.
+        Pentru inceput, o sa precizez ca m am inspirat din laborator in ceea ce
+priveste structurile route_table_entry si arp_entry. De asemenea, initializarea
+diferitelor headere (cum ar fi ether_header si ip_header) sunt, la fel, similare
+cu cele din laborator.
+        Procesul prin care am realizat aceasta tema este urmatorul:
+    -> din fisierul primit ca parametru in linia de comanda, am citit tabela de
+    routare si i-am creat intrarile in cadrul programului; parsarea se realizeaza
+    liniar, urmand ca tot in cadrul preprocesarii (deci pana in while) sa sortez
+    tabela dupa prefix, folosind functia qsort (deci, complexitate finala de
+    O(n * log n))
+    -> intrand in while: se extrag headerele necesare din mesajul primit
+    -> fac testarea daca pachetul este unul icmp; in acest caz, verificam daca
+    icmp are tipul "echo request", iar in acest caz, daca pachetul era destinat
+    routerului, atunci va trimite un icmp echo reply cu adresa mac ceruta
+    -> daca avem un pachet arp, atunci avem 2 posibilitati:
+    -> este de tip REQUEST, caz in care vom actualiza ether_header-ul si vom
+    trimite un arp reply cu adresa mac a routerului
+    -> este de tip REPLY, caz in care vom face update la tabela arp, vom lua
+    pachetele din coada si le vom trimite pe aceeasi interfata pe care a venit
+    reply-ul
+    -> daca nu este un pachet de tip arp, atunci este un pachet destinat unui
+    host sau chiar routerului, caz in care verificam daca checksum-ul este cel
+    corect si daca ttl este valid
+    -> daca conditiile de mai sus se respecta atunci se scade ttl-ul, se
+    actualizeaza checksum-ul, si se va cauta in tabela de rutare intrarea cu
+    prefixul cel mai bun (lung);
+    -> avand o tabela de rutare sortata deja din etapa de preprocesare, atunci
+    putem aplica o cautare binara asupra acesteia; prin urmare, avem o cautare
+    a intrarii de complexitate O(log n), care respecta cerinta din enunt
+    -> daca nu se gaseste nicio intrare in tabela de rutare, atunci vom trimite
+    un mesaj de tip icmp error, de tipul ICMP_UNREACH, si arunca pachetul primit
+    -> daca se gaseste intrarea dorita in tabela de rutare, atunci urmeaza sa o
+    cautam si in tabela arp
+    -> daca gasim in arp intrarea, atunci stim adresa mac, se va dirija direct
+    pachetul catre next_hop
+    -> daca nu s-a gasit respectiva intrare in tabela arp, atunci router-ul va
+    face un arp request la broadcast, pentru a afla cine are respectiva adresa
+    ip
+    -> de remarcat e ca in cazul in care nu s-a gasit matching-ul in tabela arp,
+    mesajul va fi salvat intr-o coada de pachete, urmand sa fie trimis in momentul
+    in care se va primi un arp reply
+    -> o ultima verificare este cea a ttl-ului; daca ttl este unul invalid, adica
+    ttl <= 1, atunci se va trimite un icmp error de tipul ICMP_TIMXCEED, cu
+    mesajul time limit exceeded.
+
+        Bonusul se regaseste in functia ip_checksum_bonus din skel.c; calculeaza
+checksum-ul dupa decrementarea ttl, folosind algoritmul de incrementare a ttl din
+RFC 1624.
